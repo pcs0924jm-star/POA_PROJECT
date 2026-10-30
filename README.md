@@ -1,13 +1,13 @@
 # POA_PROJECT
 
 ## 실행
-`dist/index.html`을 웹 서버로 제공합니다. GitHub Pages에는 이 파일을 저장소 루트의 `index.html`로 올려 사용합니다. 외부 Supabase 라이브러리를 사용하므로 인터넷 연결이 필요합니다. 상대 경로에 의존하지 않아 `/POA_PROJECT/`에서도 동작합니다.
+https://pcs0924jm-star.github.io/POA_PROJECT/ 에서 실행합니다. 로컬에서는 `index.html`을 웹 서버로 제공합니다. CSS와 JavaScript는 HTML 한 파일에 있으며, Supabase 라이브러리는 고정 버전 CDN으로 불러옵니다.
 
-Supabase 프로젝트 `ttfgbupxowhpwcqruesy`의 이메일 가입을 사용합니다. 실습용 가입 직후 자동 로그인을 위해 Confirm email을 꺼야 합니다. 현재 설정은 켜져 있으며, 기존 앱 영향 확인 후 변경이 필요합니다. 프런트엔드에는 publishable 키만 포함했습니다.
+이메일·비밀번호로 가입하면 자동 로그인됩니다. 기존 가입자는 로그인 버튼을 사용합니다. Supabase 프로젝트 `ttfgbupxowhpwcqruesy`에서 Confirm email 해제를 저장했고 `mailer_autoconfirm=true`를 확인했습니다. 프런트엔드에는 공개용 publishable 키만 사용합니다.
 
 ## 검증 결과
+- 실제 GitHub Pages 첫 화면 접속: 통과.
 - JavaScript 문법 검사: 통과.
-- DB 트랜잭션 검증: 본인 메모 조회·추가·삭제 및 다른 사용자 조회·추가·삭제 차단 통과. 테스트 데이터는 롤백했습니다.
-- 저장소 생성·HTML 업로드·GitHub Pages 배포 설정: 완료.
-- 실제 배포 사이트 6단계 검증: 이메일 확인 설정 변경 전이므로 대기.
-- 가입 직후 자동 로그인: 이메일 확인 설정 변경 전이므로 미검증.
+- DB RLS: 본인 메모 조회·추가·삭제 및 타인 조회·추가·삭제 차단 통과. 테스트 데이터는 롤백했습니다.
+- 보안 Advisor: 지적 사항 없음.
+- 가입 직후 자동 로그인, 메모 저장·목록·삭제, 새로고침 후 유지, 로그아웃·재로그인: 실제 사이트 검증 미완료. 검증용 보안 로그인 요청이 거절되어 중단했습니다.
