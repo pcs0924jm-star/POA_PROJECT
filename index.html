@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="로그인 후 나만의 메모를 저장하는 포아 실습 앱">
+<title>POA_PROJECT · 내 메모</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#fff;color:#222;font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}main{width:min(100% - 32px,600px);margin:40px auto}h1{font-size:26px;margin:0 0 4px}h2{font-size:20px;margin:0 0 16px}p{margin:8px 0}.muted{color:#666}.card{border:1px solid #ddd;border-radius:12px;padding:24px;margin:24px 0}label{display:block;margin:16px 0 6px}input,textarea,button{font:inherit;font-size:16px}input,textarea{display:block;width:100%;min-width:0;border:1px solid #aaa;border-radius:6px;padding:12px;background:#fff;color:#222}textarea{resize:vertical;min-height:140px}button{border:1px solid #333;border-radius:6px;padding:10px 18px;background:#222;color:#fff;cursor:pointer}button.secondary{background:#fff;color:#222}button:disabled{opacity:.55;cursor:wait}.buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}#message{overflow-wrap:anywhere;min-height:26px}#message.error{color:#b42318}.memo{padding:18px 0;border-top:1px solid #ddd}.memo p{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 12px}.meta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.meta time{font-size:14px;color:#666}#email-display{overflow-wrap:anywhere}.hidden,[hidden]{display:none!important}:focus-visible{outline:3px solid #4673ca;outline-offset:3px}@media(max-width:420px){main{margin:24px auto}.card{padding:18px}.buttons button{flex:1}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>POA_PROJECT</h1><p class="muted">내 계정에 저장하는 나만의 메모</p></header>
+<p id="message" role="status" aria-live="polite">로그인 상태를 확인하고 있습니다.</p>
+<section id="auth-card" class="card" hidden aria-labelledby="auth-title">
+<h2 id="auth-title">로그인 · 회원가입</h2>
+<form id="auth-form">
+<label for="email">이메일</label><input id="email" type="email" autocomplete="username" required maxlength="254">
+<label for="password">비밀번호</label><input id="password" type="password" autocomplete="current-password" minlength="6" required aria-describedby="password-help">
+<p id="password-help" class="muted">6자 이상 입력해 주세요.</p>
+<div class="buttons"><button type="submit" id="login">로그인</button><button type="button" id="signup" class="secondary">회원가입</button></div>
+</form>
+</section>
+<section id="workspace" hidden aria-labelledby="memo-title">
+<div class="card"><div class="meta"><p id="email-display"></p><button id="logout" class="secondary" type="button">로그아웃</button></div></div>
+<div class="card"><h2 id="memo-title">메모 작성</h2><form id="memo-form"><label for="content">메모 내용</label><textarea id="content" maxlength="5000" required placeholder="기억하고 싶은 내용을 입력하세요."></textarea><div class="buttons"><button type="submit" id="save">저장</button></div></form></div>
+<div class="card"><h2>내 메모 목록</h2><div id="memo-list" aria-live="polite"></div></div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.js" crossorigin="anonymous"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const message=(text,error=false)=>{$('message').textContent=text;$('message').className=error?'error':'';};
+if(!window.supabase){message('로그인 라이브러리를 불러오지 못했습니다. 인터넷 연결 후 새로고침해 주세요.',true);}else{
+const client=window.supabase.createClient('https://ttfgbupxowhpwcqruesy.supabase.co','sb_publishable_iMRgckvLy3fpGkABWW_oIg_pcAjnpHM',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+let currentUser=null,busy=false,viewVersion=0;
+function lock(value){busy=value;document.querySelectorAll('button').forEach(b=>b.disabled=value);}
+function readable(error){if(error?.message?.includes('Invalid login credentials'))return '이메일 또는 비밀번호를 확인해 주세요.';if(error?.message?.includes('Email not confirmed'))return '현재 프로젝트의 이메일 확인 설정이 켜져 있습니다. 실습 설정을 확인해 주세요.';if(error?.message?.includes('already registered'))return '이미 가입된 이메일입니다. 로그인해 주세요.';if(error?.message?.includes('rate limit'))return '요청이 많습니다. 잠시 후 다시 시도해 주세요.';if(error?.message?.includes('Failed to fetch'))return '서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.';return '처리하지 못했습니다. '+(error?.message||'잠시 후 다시 시도해 주세요.');}
+function clearPrivate(){currentUser=null;viewVersion++;$('workspace').hidden=true;$('auth-card').hidden=false;$('memo-list').replaceChildren();$('email-display').textContent='';$('content').value='';}
+async function listMemos(){const version=++viewVersion;const uid=currentUser?.id;if(!uid)return;const{data,error}=await client.from('memos').select('id,user_id,content,created_at').eq('user_id',uid).order('created_at',{ascending:false});if(version!==viewVersion||currentUser?.id!==uid)return;if(error)throw error;const list=$('memo-list');list.replaceChildren();if(!data.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='아직 저장한 메모가 없습니다.';list.append(empty);return;}for(const memo of data){const article=document.createElement('article');article.className='memo';const text=document.createElement('p');text.textContent=memo.content;const meta=document.createElement('div');meta.className='meta';const time=document.createElement('time');time.dateTime=memo.created_at;time.textContent=new Date(memo.created_at).toLocaleString('ko-KR');const del=document.createElement('button');del.type='button';del.className='secondary';del.textContent='삭제';del.setAttribute('aria-label','메모 삭제: '+memo.content.slice(0,30));del.addEventListener('click',()=>removeMemo(memo.id));meta.append(time,del);article.append(text,meta);list.append(article);}}
+async function showUser(user){currentUser=user;$('auth-card').hidden=true;$('workspace').hidden=false;$('email-display').textContent=user.email||'';await listMemos();}
+async function checkSession(){const{data:{user},error}=await client.auth.getUser();if(!user){clearPrivate();if(error&&error.name!=='AuthSessionMissingError')message(readable(error),true);else message('로그인하거나 새 계정을 만들어 주세요.');return;}await showUser(user);message('로그인되었습니다.');}
+async function authenticate(signup){if(busy||!$('auth-form').reportValidity())return;lock(true);message(signup?'가입 중입니다.':'로그인 중입니다.');try{const credentials={email:$('email').value.trim(),password:$('password').value};const{data,error}=signup?await client.auth.signUp(credentials):await client.auth.signInWithPassword(credentials);if(error)throw error;$('password').value='';if(!data.session){message('가입 요청은 접수됐지만 자동 로그인되지 않았습니다. 프로젝트의 이메일 확인 설정을 확인해 주세요.',true);return;}const{data:verified,error:verifyError}=await client.auth.getUser();if(verifyError||!verified.user)throw verifyError||new Error('로그인 상태를 확인하지 못했습니다.');await showUser(verified.user);message(signup?'회원가입이 완료되어 자동 로그인되었습니다.':'로그인되었습니다.');}catch(error){message(readable(error),true);}finally{lock(false);}}
+$('auth-form').addEventListener('submit',e=>{e.preventDefault();authenticate(false);});$('signup').addEventListener('click',()=>authenticate(true));
+$('memo-form').addEventListener('submit',async e=>{e.preventDefault();if(busy||!currentUser)return;const content=$('content').value.trim();if(!content){message('메모 내용을 입력해 주세요.',true);return;}lock(true);$('save').textContent='저장 중…';message('저장 중입니다.');try{const{data:{user},error:authError}=await client.auth.getUser();if(authError||!user){clearPrivate();throw new Error('로그인이 만료됐습니다. 다시 로그인해 주세요.');}const{error}=await client.from('memos').insert({user_id:user.id,content});if(error)throw error;$('content').value='';await listMemos();message('메모를 저장했습니다.');}catch(error){message(readable(error),true);}finally{$('save').textContent='저장';lock(false);}});
+async function removeMemo(id){if(busy||!currentUser)return;lock(true);message('삭제 중입니다.');try{const{data,error}=await client.from('memos').delete().eq('id',id).eq('user_id',currentUser.id).select('id');if(error)throw error;if(!data.length)throw new Error('메모가 없거나 접근할 수 없습니다.');await listMemos();message('메모를 삭제했습니다.');}catch(error){message(readable(error),true);}finally{lock(false);}}
+$('logout').addEventListener('click',async()=>{if(busy)return;lock(true);try{const{error}=await client.auth.signOut();if(error)throw error;clearPrivate();$('password').value='';history.replaceState(null,'',location.pathname+location.search);message('로그아웃되었습니다.');}catch(error){message(readable(error),true);}finally{lock(false);}});
+client.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){clearPrivate();message('로그아웃되었습니다.');}});
+checkSession().catch(error=>{clearPrivate();message(readable(error),true);});
+}
+</script>
+</body>
+</html>
